@@ -1,0 +1,156 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>LifeLedger</title><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#17595a"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="LifeLedger"><link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{--bg:#f3f1ea;--card:#fffefa;--tx:#1b2430;--mu:#6b7480;--bd:#dedbd0;--ac:#17595a;--in:#1d7a46;--ex:#a8321f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121715;--card:#1a211f;--tx:#e8ebe6;--mu:#98a39d;--bd:#2c3631;--ac:#5cc2b8;--in:#68c78d;--ex:#f08a77}}
+:root[data-theme="dark"]{--bg:#121715;--card:#1a211f;--tx:#e8ebe6;--mu:#98a39d;--bd:#2c3631;--ac:#5cc2b8;--in:#68c78d;--ex:#f08a77}
+*,*:before,*:after{box-sizing:inherit}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2,h3,.big{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.app{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+nav{border-right:1px solid var(--bd);padding:20px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+nav h1{font-size:22px;padding:0 10px 16px;color:var(--ac)}
+nav button{background:none;border:0;text-align:left;padding:9px 10px;border-radius:6px;cursor:pointer;color:var(--mu)}
+nav button.on{background:var(--card);color:var(--tx);font-weight:600;box-shadow:inset 3px 0 var(--ac)}
+main{padding:24px;max-width:960px;width:100%}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:18px}
+.top h2{font-size:26px}
+.btn{background:var(--ac);color:var(--card);border:0;padding:9px 16px;border-radius:6px;cursor:pointer;font-weight:600}
+.btn.o{background:none;color:var(--tx);border:1px solid var(--bd)}.btn.s{padding:4px 9px;font-size:13px}
+.hero{border-bottom:2px solid var(--tx);padding-bottom:14px;margin-bottom:18px}
+.hero .big{font-size:44px;line-height:1.1}.mu{color:var(--mu)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:14px}
+.card .big{font-size:22px;margin-top:2px}
+.in{color:var(--in)}.ex{color:var(--ex)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}
+.row:last-child{border:0}.row .m{flex:1;min-width:0}.row .m b,.row .m small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .a{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+.bar{height:6px;background:var(--bd);border-radius:3px;margin-top:4px}.bar i{display:block;height:100%;background:var(--ac);border-radius:3px}
+.f{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+input,select{background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:9px 10px;width:100%}
+.f input,.f select{flex:1;min-width:120px;width:auto}
+dialog{border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);width:min(480px,94vw);padding:18px;max-height:92vh;overflow:auto}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+label{display:block;font-size:13px;color:var(--mu);margin:10px 0 3px}
+.seg{display:flex;gap:6px}.seg button{flex:1;padding:8px;border:1px solid var(--bd);background:none;border-radius:6px;cursor:pointer}.seg button.on{background:var(--ac);color:var(--card);border-color:var(--ac)}
+.hide{display:none!important}
+textarea{width:100%;min-height:110px;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:8px;font:12px monospace}
+.fab{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));box-shadow:0 4px 14px rgba(0,0,0,.25);padding:13px 20px;border-radius:30px;z-index:5}
+.empty{padding:28px 10px;text-align:center;color:var(--mu)}
+@media(max-width:800px){.app{display:block;padding-bottom:70px}main{padding:16px}
+nav{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;flex-direction:row;border:0;border-top:1px solid var(--bd);background:var(--card);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));z-index:4;justify-content:space-around}
+nav h1{display:none}nav button{text-align:center;padding:8px 6px;font-size:13px;flex:1}nav button.on{box-shadow:inset 0 3px var(--ac)}
+.fab{bottom:calc(76px + env(safe-area-inset-bottom,0px))}.hero .big{font-size:36px}.two{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app"><nav id="nav" aria-label="Main"></nav><main id="main"></main></div>
+<button class="btn fab" id="add" aria-label="Add transaction">+ Add</button>
+<dialog id="dlg"></dialog>
+<script>
+const K='lifeledger_v1',$=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,10);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+let db;try{db=JSON.parse(ls(K))}catch(e){}
+if(!db){db={cur:'₹',accounts:[],cats:[],merchants:[],companies:[],tx:[]};
+['Food:Restaurants,Groceries,Food Delivery,Coffee,Snacks','Housing','Transport','Shopping','Travel','Entertainment','Health','Education','Family','Bills','Subscriptions','Work','Taxes','Banking','Gifts','Other'].forEach(s=>{const[n,subs]=s.split(':');db.cats.push({id:uid(),name:n,subs:(subs?subs.split(','):[]).map(x=>({id:uid(),name:x}))})})}
+const save=()=>ls(K,JSON.stringify(db));
+let view=ls('ll_view')||'dash',priv=ls('ll_priv')==='1',q='',ft='all',armed='';
+const live=()=>db.tx.filter(t=>!t.del);
+const nm=(a,id)=>(a.find(x=>x.id==id)||{}).name||'';
+const fmt=n=>priv?db.cur+'••••••':(n<0?'-':'')+db.cur+Math.abs(Math.round(n*100)/100).toLocaleString('en-IN');
+const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+function bal(a){let b=+a.opening||0;live().forEach(t=>{if(t.type=='income'&&t.acc==a.id)b+=t.amt;else if(t.type=='expense'&&t.acc==a.id)b-=t.amt;else if(t.type=='transfer'){if(t.acc==a.id)b-=t.amt;if(t.to==a.id)b+=t.amt}});return b}
+const sum=(f)=>live().filter(f).reduce((s,t)=>s+t.amt,0);
+function render(){
+ const V={dash:['Dashboard',dash],tx:['Transactions',txs],acc:['Accounts',accs],more:['More',more]};
+ $('#nav').innerHTML='<h1>LifeLedger</h1>'+Object.entries(V).map(([k,v])=>`<button class="${k==view?'on':''}" data-v="${k}">${v[0]}</button>`).join('');
+ $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{view=b.dataset.v;ls('ll_view',view);q='';render()});
+ $('#main').innerHTML=`<div class="top"><h2>${V[view][0]}</h2><button class="btn o s" id="pv" aria-pressed="${priv}">${priv?'Show':'Hide'} amounts</button></div>`+V[view][1]();
+ $('#pv').onclick=()=>{priv=!priv;ls('ll_priv',priv?'1':'0');render()};
+ bind&&bind();bind=null}
+let bind=null;
+function dash(){
+ const nw=db.accounts.reduce((s,a)=>s+bal(a),0),inc=sum(t=>t.type=='income'),exp=sum(t=>t.type=='expense'),ym=today().slice(0,7);
+ const mi=sum(t=>t.type=='income'&&t.date.startsWith(ym)),me=sum(t=>t.type=='expense'&&t.date.startsWith(ym));
+ const first=live().filter(t=>t.type=='income').map(t=>t.date).sort()[0];
+ const ms=[];for(let i=5;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);const k=d.toISOString().slice(0,7);ms.push({k,l:d.toLocaleString('en',{month:'short'}),i:sum(t=>t.type=='income'&&t.date.startsWith(k)),e:sum(t=>t.type=='expense'&&t.date.startsWith(k))})}
+ const mx=Math.max(1,...ms.flatMap(m=>[m.i,m.e]));
+ const bars=ms.map((m,x)=>`<rect x="${x*48+8}" y="${100-m.i/mx*90}" width="16" height="${m.i/mx*90}" fill="var(--in)"/><rect x="${x*48+25}" y="${100-m.e/mx*90}" width="16" height="${m.e/mx*90}" fill="var(--ex)"/><text x="${x*48+25}" y="116" font-size="10" text-anchor="middle" fill="var(--mu)">${m.l}</text>`).join('');
+ const cs={};live().filter(t=>t.type=='expense').forEach(t=>{const n=nm(db.cats,t.cat)||'Uncategorised';cs[n]=(cs[n]||0)+t.amt});
+ const top=Object.entries(cs).sort((a,b)=>b[1]-a[1]).slice(0,6),tm=top[0]?top[0][1]:1;
+ const co={};live().filter(t=>t.type=='income'&&t.co).forEach(t=>{const n=nm(db.companies,t.co);co[n]=(co[n]||0)+t.amt});
+ return `<div class="hero"><div class="mu">Net worth (all accounts)</div><div class="big">${fmt(nw)}</div><div class="mu">${first?'Earning since '+first:'Add your first income to start your lifetime record'}</div></div>
+ <div class="grid"><div class="card"><div class="mu">Lifetime earnings</div><div class="big in">${fmt(inc)}</div></div><div class="card"><div class="mu">Lifetime spending</div><div class="big ex">${fmt(exp)}</div></div><div class="card"><div class="mu">Lifetime savings</div><div class="big">${fmt(inc-exp)}</div></div><div class="card"><div class="mu">Lifetime savings rate</div><div class="big">${inc?Math.round((inc-exp)/inc*100)+'%':'–'}</div></div></div>
+ <div class="grid"><div class="card"><div class="mu">This month income</div><div class="big">${fmt(mi)}</div></div><div class="card"><div class="mu">This month expenses</div><div class="big">${fmt(me)}</div></div><div class="card"><div class="mu">This month savings rate</div><div class="big">${mi?Math.round((mi-me)/mi*100)+'%':'–'}</div></div></div>
+ <div class="two"><div class="card"><h3>Income vs expenses</h3><svg viewBox="0 0 290 122" width="100%" role="img" aria-label="Six month income and expense bars">${bars}</svg></div>
+ <div class="card"><h3>Top spending categories</h3>${top.length?top.map(([n,v])=>`<div style="margin-top:8px"><div style="display:flex;justify-content:space-between"><span>${esc(n)}</span><span>${fmt(v)}</span></div><div class="bar"><i style="width:${v/tm*100}%"></i></div></div>`).join(''):'<div class="empty">No expenses yet</div>'}</div></div>
+ ${Object.keys(co).length?`<div class="card" style="margin-top:12px"><h3>Income by company</h3>${Object.entries(co).map(([n,v])=>`<div class="row"><div class="m">${esc(n)}</div><div class="a in">${fmt(v)}</div></div>`).join('')}</div>`:''}`}
+function txs(){
+ let l=live().filter(t=>ft=='all'||t.type==ft);
+ if(q){const s=q.toLowerCase();l=l.filter(t=>[t.desc,nm(db.cats,t.cat),nm(db.merchants,t.mer),nm(db.accounts,t.acc),nm(db.companies,t.co),t.amt,t.date].join(' ').toLowerCase().includes(s))}
+ l.sort((a,b)=>(b.date+b.at).localeCompare(a.date+a.at));
+ bind=()=>{$('#q').oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)};$('#ft').onchange=e=>{ft=e.target.value;render()};rowBind()};
+ return `<div class="f"><input id="q" type="search" placeholder="Search description, merchant, account, company…" value="${esc(q)}" aria-label="Search transactions"><select id="ft" aria-label="Filter type">${['all','income','expense','transfer'].map(x=>`<option ${x==ft?'selected':''} value="${x}">${x=='all'?'All types':x[0].toUpperCase()+x.slice(1)}</option>`).join('')}</select></div>
+ <div class="card">${l.length?l.slice(0,200).map(t=>{const sg=t.type=='income'?'+':t.type=='expense'?'-':'';const sub=[nm(db.cats,t.cat),nm(db.merchants,t.mer),nm(db.companies,t.co),t.type=='transfer'?nm(db.accounts,t.acc)+' → '+nm(db.accounts,t.to):nm(db.accounts,t.acc)].filter(Boolean).join(' · ');
+ return `<div class="row"><div class="m"><b>${esc(t.desc||nm(db.merchants,t.mer)||nm(db.companies,t.co)||t.type)}</b><small class="mu">${t.date} · ${esc(sub)}</small></div><div class="a ${t.type=='income'?'in':t.type=='expense'?'ex':''}">${sg}${fmt(t.amt).replace('-','')}</div><button class="btn o s" data-e="${t.id}" aria-label="Edit">Edit</button><button class="btn o s" data-d="${t.id}" aria-label="Move to trash">Trash</button></div>`}).join(''):'<div class="empty">No transactions found. Tap “+ Add” to record one.</div>'}</div>${l.length>200?'<p class="mu">Showing newest 200. Refine your search to narrow down.</p>':''}`}
+function rowBind(){document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>form(b.dataset.e));document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const t=db.tx.find(x=>x.id==b.dataset.d);t.del=Date.now();save();render()})}
+function accs(){
+ bind=()=>{$('#na').onclick=()=>accForm()};
+ const tot=db.accounts.reduce((s,a)=>s+bal(a),0);
+ return `<div class="f"><button class="btn" id="na">+ Add account</button></div><div class="card">${db.accounts.length?db.accounts.map(a=>`<div class="row"><div class="m"><b>${esc(a.name)}</b><small class="mu">${esc(a.type)}</small></div><div class="a ${bal(a)<0?'ex':''}">${fmt(bal(a))}</div></div>`).join('')+`<div class="row"><div class="m"><b>Total</b></div><div class="a">${fmt(tot)}</div></div>`:'<div class="empty">No accounts yet. Add a bank account, cash or card to start tracking balances.</div>'}</div>`}
+function accForm(){const d=$('#dlg');d.innerHTML=`<h3>New account</h3><label for="an">Name</label><input id="an" placeholder="HDFC Salary Account"><label for="at">Type</label><select id="at">${['Bank','Savings','Current','Cash','Credit Card','Wallet','Investment','Fixed Deposit','Other'].map(x=>`<option>${x}</option>`).join('')}</select><label for="ao">Opening balance</label><input id="ao" type="number" step="0.01" value="0"><div class="f" style="margin-top:14px"><button class="btn o" id="x">Cancel</button><button class="btn" id="ok">Save account</button></div>`;
+ d.showModal();$('#x').onclick=()=>d.close();$('#ok').onclick=()=>{const n=$('#an').value.trim();if(!n)return $('#an').focus();db.accounts.push({id:uid(),name:n,type:$('#at').value,opening:+$('#ao').value||0});save();d.close();render()}}
+function ens(arr,name,x){name=(name||'').trim();if(!name)return null;let e=arr.find(i=>i.name.toLowerCase()==name.toLowerCase());if(!e){e=Object.assign({id:uid(),name},x||{});arr.push(e)}return e}
+const dl=(id,arr)=>`<datalist id="${id}">${arr.map(x=>`<option value="${esc(x.name)}">`).join('')}</datalist>`;
+function recent(arr,key){const c={};live().slice(-60).forEach(t=>{if(t[key])c[t[key]]=(c[t[key]]||0)+1});return arr.slice().sort((a,b)=>(c[b.id]||0)-(c[a.id]||0))}
+function form(id){
+ const t=id?db.tx.find(x=>x.id==id):null,last=live().slice(-1)[0]||{};
+ let type=t?t.type:'expense';const d=$('#dlg');
+ const catName=t?nm(db.cats,t.cat):'',c0=db.cats.find(c=>c.name==catName);
+ d.innerHTML=`<h3>${t?'Edit':'Add'} transaction</h3><div class="seg" role="group" aria-label="Type" style="margin-top:10px">${['expense','income','transfer'].map(x=>`<button data-t="${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div>
+ <label for="fa">Amount</label><input id="fa" type="number" inputmode="decimal" step="0.01" value="${t?t.amt:''}" placeholder="0">
+ <label for="fd">Date</label><input id="fd" type="date" value="${t?t.date:today()}">
+ <label for="fc2" id="lacc">Account</label><input id="fac" list="dl-a" value="${esc(t?nm(db.accounts,t.acc):nm(db.accounts,last.acc))}" placeholder="Search or type a new account">
+ <div data-for="transfer"><label>To account</label><input id="fto" list="dl-a" value="${esc(t?nm(db.accounts,t.to):'')}" placeholder="Search or type a new account"></div>
+ <div data-for="expense"><label>Merchant</label><input id="fm" list="dl-m" value="${esc(t?nm(db.merchants,t.mer):'')}" placeholder="Swiggy, Amazon…">
+ <label>Category</label><input id="fc" list="dl-c" value="${esc(catName)}" placeholder="Food"><label>Subcategory</label><input id="fs" list="dl-s" value="${esc(c0&&t?nm(c0.subs,t.sub):'')}" placeholder="Food Delivery"></div>
+ <div data-for="income"><label>Company (employer or payer)</label><input id="fco" list="dl-co" value="${esc(t?nm(db.companies,t.co):'')}" placeholder="Google"></div>
+ <label>Description</label><input id="fx" value="${esc(t?t.desc:'')}" placeholder="Optional">
+ <p class="mu" style="font-size:12px;margin:8px 0 0">Type a name that doesn’t exist yet and it is created and reused next time.</p>
+ ${dl('dl-a',recent(db.accounts,'acc'))}${dl('dl-m',recent(db.merchants,'mer'))}${dl('dl-c',recent(db.cats,'cat'))}<datalist id="dl-s"></datalist>${dl('dl-co',recent(db.companies,'co'))}
+ <div class="f" style="margin-top:14px"><button class="btn o" id="x">Cancel</button><button class="btn" id="ok">Save</button></div>`;
+ const sync=()=>{d.querySelectorAll('[data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t==type));d.querySelectorAll('[data-for]').forEach(e=>e.classList.toggle('hide',e.dataset.for!=type))};
+ const subs=()=>{const c=db.cats.find(c=>c.name.toLowerCase()==$('#fc').value.trim().toLowerCase());$('#dl-s').innerHTML=c?c.subs.map(s=>`<option value="${esc(s.name)}">`).join(''):''};
+ d.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{type=b.dataset.t;sync()});sync();subs();
+ $('#fc').oninput=subs;
+ $('#fm').onchange=()=>{const m=db.merchants.find(m=>m.name.toLowerCase()==$('#fm').value.trim().toLowerCase());if(m&&m.cat){const c=db.cats.find(c=>c.id==m.cat);if(c&&!$('#fc').value){$('#fc').value=c.name;subs();$('#fs').value=nm(c.subs,m.sub)}}};
+ d.showModal();$('#x').onclick=()=>d.close();
+ $('#ok').onclick=()=>{const amt=+$('#fa').value;if(!(amt>0))return $('#fa').focus();
+  const acc=ens(db.accounts,$('#fac').value,{type:'Bank',opening:0});if(!acc)return $('#fac').focus();
+  const o={type,amt,date:$('#fd').value||today(),acc:acc.id,desc:$('#fx').value.trim(),updated:Date.now()};
+  if(type=='transfer'){const to=ens(db.accounts,$('#fto').value,{type:'Bank',opening:0});if(!to||to.id==acc.id)return $('#fto').focus();o.to=to.id}
+  if(type=='expense'){const c=ens(db.cats,$('#fc').value,{subs:[]});if(c){o.cat=c.id;const s=ens(c.subs,$('#fs').value);if(s)o.sub=s.id}
+   const m=ens(db.merchants,$('#fm').value,{cat:o.cat,sub:o.sub});if(m){o.mer=m.id;if(!m.cat&&o.cat){m.cat=o.cat;m.sub=o.sub}}}
+  if(type=='income'){const co=ens(db.companies,$('#fco').value);if(co)o.co=co.id}
+  if(t)Object.assign(t,{cat:0,sub:0,mer:0,co:0,to:0},o);else db.tx.push(Object.assign({id:uid(),at:String(Date.now()),created:Date.now()},o));
+  save();d.close();view='tx';render()}}
+function more(){
+ const trash=db.tx.filter(t=>t.del);
+ bind=()=>{
+  $('#cur').onchange=e=>{db.cur=e.target.value||'₹';save();render()};
+  $('#th').onclick=()=>{const r=document.documentElement,dk=getComputedStyle(r).getPropertyValue('--bg').trim()=='#121715';r.dataset.theme=dk?'light':'dark'};
+  $('#ej').onclick=()=>$('#bk').value=JSON.stringify(db);
+  $('#ec').onclick=()=>$('#bk').value='date,type,amount,account,category,merchant,company,description\n'+live().map(t=>[t.date,t.type,t.amt,nm(db.accounts,t.acc),nm(db.cats,t.cat),nm(db.merchants,t.mer),nm(db.companies,t.co),t.desc].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  $('#ij').onclick=()=>{if(armed!='imp'){armed='imp';$('#ij').textContent='Replace all data? Tap again';return}armed='';try{const n=JSON.parse($('#bk').value);if(!n.tx||!n.accounts)throw 0;db=n;save();render()}catch(e){$('#ij').textContent='Not a valid LifeLedger backup'}};
+  document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{delete db.tx.find(x=>x.id==b.dataset.r).del;save();render()});
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(armed!=b.dataset.p){armed=b.dataset.p;b.textContent='Sure?';return}armed='';db.tx=db.tx.filter(x=>x.id!=b.dataset.p);save();render()})};
+ return `<div class="card"><h3>Preferences</h3><label for="cur">Currency symbol</label><input id="cur" value="${esc(db.cur)}" style="max-width:120px"><div class="f" style="margin-top:12px"><button class="btn o" id="th">Toggle light / dark</button></div></div>
+ <div class="card" style="margin-top:12px"><h3>Backup &amp; export</h3><p class="mu">Your data lives only in this browser. Copy a backup somewhere safe.</p><div class="f"><button class="btn o" id="ej">Backup (JSON)</button><button class="btn o" id="ec">Export CSV</button><button class="btn o" id="ij">Restore from box</button></div><textarea id="bk" aria-label="Backup data" placeholder="Backup or CSV appears here. Paste a JSON backup here to restore."></textarea></div>
+ <div class="card" style="margin-top:12px"><h3>Trash (${trash.length})</h3>${trash.length?trash.map(t=>`<div class="row"><div class="m"><b>${esc(t.desc||t.type)}</b><small class="mu">${t.date}</small></div><div class="a">${fmt(t.amt)}</div><button class="btn o s" data-r="${t.id}">Restore</button><button class="btn o s" data-p="${t.id}">Delete forever</button></div>`).join(''):'<div class="empty">Trash is empty.</div>'}</div>`}
+$('#add').onclick=()=>form();
+if('serviceWorker' in navigator&&location.protocol.startsWith('http')){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+
+render();
+</script></body></html>
