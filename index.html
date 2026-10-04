@@ -44,6 +44,7 @@ textarea{width:100%;min-height:110px;background:var(--bg);color:var(--tx);border
 nav{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;flex-direction:row;border:0;border-top:1px solid var(--bd);background:var(--card);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));z-index:4;justify-content:space-around}
 nav h1{display:none}nav button{text-align:center;padding:8px 6px;font-size:13px;flex:1}nav button.on{box-shadow:inset 0 3px var(--ac)}
 .fab{bottom:calc(76px + env(safe-area-inset-bottom,0px))}.hero .big{font-size:36px}.two{grid-template-columns:1fr}}
+@media(max-width:800px){nav button{font-size:12px;padding:8px 2px}}
 </style></head><body>
 <div class="app"><nav id="nav" aria-label="Main"></nav><main id="main"></main></div>
 <button class="btn fab" id="add" aria-label="Add transaction">+ Add</button>
@@ -52,10 +53,14 @@ nav h1{display:none}nav button{text-align:center;padding:8px 6px;font-size:13px;
 const K='lifeledger_v1',$=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,10);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
-let db;try{db=JSON.parse(ls(K))}catch(e){}
-if(!db){db={cur:'₹',accounts:[],cats:[],merchants:[],companies:[],tx:[]};
+let db;if(!ls('ll_enc'))try{db=JSON.parse(ls(K))}catch(e){}
+if(!db){db={cur:'₹',accounts:[],cats:[],merchants:[],companies:[],tx:[],rules:[],jobs:[],items:[]};
 ['Food:Restaurants,Groceries,Food Delivery,Coffee,Snacks','Housing','Transport','Shopping','Travel','Entertainment','Health','Education','Family','Bills','Subscriptions','Work','Taxes','Banking','Gifts','Other'].forEach(s=>{const[n,subs]=s.split(':');db.cats.push({id:uid(),name:n,subs:(subs?subs.split(','):[]).map(x=>({id:uid(),name:x}))})})}
-const save=()=>ls(K,JSON.stringify(db));
+let KEY=null,LOCKED=!!ls('ll_enc'),fails=+ls('ll_fail')||0;
+const b64=b=>{let s='';new Uint8Array(b).forEach(c=>s+=String.fromCharCode(c));return btoa(s)},ub=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function derive(pw,salt){const m=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},m,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function seal(){const iv=crypto.getRandomValues(new Uint8Array(12)),ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},KEY,new TextEncoder().encode(JSON.stringify(db)));ls('ll_enc',JSON.stringify({iv:b64(iv),ct:b64(ct)}))}
+const save=()=>{if(LOCKED)return;if(KEY)seal();else ls(K,JSON.stringify(db))};
 let view=ls('ll_view')||'dash',priv=ls('ll_priv')==='1',q='',ft='all',armed='';
 const live=()=>db.tx.filter(t=>!t.del);
 const nm=(a,id)=>(a.find(x=>x.id==id)||{}).name||'';
@@ -64,15 +69,17 @@ const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4)
 function bal(a){let b=+a.opening||0;live().forEach(t=>{if(t.type=='income'&&t.acc==a.id)b+=t.amt;else if(t.type=='expense'&&t.acc==a.id)b-=t.amt;else if(t.type=='transfer'){if(t.acc==a.id)b-=t.amt;if(t.to==a.id)b+=t.amt}});return b}
 const sum=(f)=>live().filter(f).reduce((s,t)=>s+t.amt,0);
 function render(){
- const V={dash:['Dashboard',dash],tx:['Transactions',txs],acc:['Accounts',accs],more:['More',more]};
+ $('#add').style.display=LOCKED?'none':'';
+ if(LOCKED){$('#nav').innerHTML='';$('#main').innerHTML=lockHtml();lockBind();return}
+ const V={dash:['Dashboard',dash],tx:['Transactions',txs],rep:['Repeats',reps],plan:['Plan',plan],acc:['Accounts',accs],more:['More',more]};if(!V[view])view='dash';
  $('#nav').innerHTML='<h1>LifeLedger</h1>'+Object.entries(V).map(([k,v])=>`<button class="${k==view?'on':''}" data-v="${k}">${v[0]}</button>`).join('');
  $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{view=b.dataset.v;ls('ll_view',view);q='';render()});
  $('#main').innerHTML=`<div class="top"><h2>${V[view][0]}</h2><button class="btn o s" id="pv" aria-pressed="${priv}">${priv?'Show':'Hide'} amounts</button></div>`+V[view][1]();
  $('#pv').onclick=()=>{priv=!priv;ls('ll_priv',priv?'1':'0');render()};
- bind&&bind();bind=null}
+ bind&&bind();bind=null;dueBind()}
 let bind=null;
 function dash(){
- const nw=db.accounts.reduce((s,a)=>s+bal(a),0),inc=sum(t=>t.type=='income'),exp=sum(t=>t.type=='expense'),ym=today().slice(0,7);
+ const nw=db.accounts.reduce((s,a)=>s+bal(a),0)+ib('investment')+ib('asset')-ib('liability'),inc=sum(t=>t.type=='income'),exp=sum(t=>t.type=='expense'),ym=today().slice(0,7);
  const mi=sum(t=>t.type=='income'&&t.date.startsWith(ym)),me=sum(t=>t.type=='expense'&&t.date.startsWith(ym));
  const first=live().filter(t=>t.type=='income').map(t=>t.date).sort()[0];
  const ms=[];for(let i=5;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);const k=d.toISOString().slice(0,7);ms.push({k,l:d.toLocaleString('en',{month:'short'}),i:sum(t=>t.type=='income'&&t.date.startsWith(k)),e:sum(t=>t.type=='expense'&&t.date.startsWith(k))})}
@@ -81,7 +88,7 @@ function dash(){
  const cs={};live().filter(t=>t.type=='expense').forEach(t=>{const n=nm(db.cats,t.cat)||'Uncategorised';cs[n]=(cs[n]||0)+t.amt});
  const top=Object.entries(cs).sort((a,b)=>b[1]-a[1]).slice(0,6),tm=top[0]?top[0][1]:1;
  const co={};live().filter(t=>t.type=='income'&&t.co).forEach(t=>{const n=nm(db.companies,t.co);co[n]=(co[n]||0)+t.amt});
- return `<div class="hero"><div class="mu">Net worth (all accounts)</div><div class="big">${fmt(nw)}</div><div class="mu">${first?'Earning since '+first:'Add your first income to start your lifetime record'}</div></div>
+ return dueHtml()+`<div class="hero"><div class="mu">Net worth</div><div class="big">${fmt(nw)}</div><div class="mu">${first?'Earning since '+first:'Add your first income to start your lifetime record'}</div></div>
  <div class="grid"><div class="card"><div class="mu">Lifetime earnings</div><div class="big in">${fmt(inc)}</div></div><div class="card"><div class="mu">Lifetime spending</div><div class="big ex">${fmt(exp)}</div></div><div class="card"><div class="mu">Lifetime savings</div><div class="big">${fmt(inc-exp)}</div></div><div class="card"><div class="mu">Lifetime savings rate</div><div class="big">${inc?Math.round((inc-exp)/inc*100)+'%':'–'}</div></div></div>
  <div class="grid"><div class="card"><div class="mu">This month income</div><div class="big">${fmt(mi)}</div></div><div class="card"><div class="mu">This month expenses</div><div class="big">${fmt(me)}</div></div><div class="card"><div class="mu">This month savings rate</div><div class="big">${mi?Math.round((mi-me)/mi*100)+'%':'–'}</div></div></div>
  <div class="two"><div class="card"><h3>Income vs expenses</h3><svg viewBox="0 0 290 122" width="100%" role="img" aria-label="Six month income and expense bars">${bars}</svg></div>
@@ -139,18 +146,75 @@ function form(id){
 function more(){
  const trash=db.tx.filter(t=>t.del);
  bind=()=>{
-  $('#cur').onchange=e=>{db.cur=e.target.value||'₹';save();render()};
+  secBind();$('#cur').onchange=e=>{db.cur=e.target.value||'₹';save();render()};
   $('#th').onclick=()=>{const r=document.documentElement,dk=getComputedStyle(r).getPropertyValue('--bg').trim()=='#121715';r.dataset.theme=dk?'light':'dark'};
   $('#ej').onclick=()=>$('#bk').value=JSON.stringify(db);
   $('#ec').onclick=()=>$('#bk').value='date,type,amount,account,category,merchant,company,description\n'+live().map(t=>[t.date,t.type,t.amt,nm(db.accounts,t.acc),nm(db.cats,t.cat),nm(db.merchants,t.mer),nm(db.companies,t.co),t.desc].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
   $('#ij').onclick=()=>{if(armed!='imp'){armed='imp';$('#ij').textContent='Replace all data? Tap again';return}armed='';try{const n=JSON.parse($('#bk').value);if(!n.tx||!n.accounts)throw 0;db=n;save();render()}catch(e){$('#ij').textContent='Not a valid LifeLedger backup'}};
   document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{delete db.tx.find(x=>x.id==b.dataset.r).del;save();render()});
   document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(armed!=b.dataset.p){armed=b.dataset.p;b.textContent='Sure?';return}armed='';db.tx=db.tx.filter(x=>x.id!=b.dataset.p);save();render()})};
- return `<div class="card"><h3>Preferences</h3><label for="cur">Currency symbol</label><input id="cur" value="${esc(db.cur)}" style="max-width:120px"><div class="f" style="margin-top:12px"><button class="btn o" id="th">Toggle light / dark</button></div></div>
+ return secHtml()+`<div class="card" style="margin-top:12px"><h3>Preferences</h3><label for="cur">Currency symbol</label><input id="cur" value="${esc(db.cur)}" style="max-width:120px"><div class="f" style="margin-top:12px"><button class="btn o" id="th">Toggle light / dark</button></div></div>
  <div class="card" style="margin-top:12px"><h3>Backup &amp; export</h3><p class="mu">Your data lives only in this browser. Copy a backup somewhere safe.</p><div class="f"><button class="btn o" id="ej">Backup (JSON)</button><button class="btn o" id="ec">Export CSV</button><button class="btn o" id="ij">Restore from box</button></div><textarea id="bk" aria-label="Backup data" placeholder="Backup or CSV appears here. Paste a JSON backup here to restore."></textarea></div>
  <div class="card" style="margin-top:12px"><h3>Trash (${trash.length})</h3>${trash.length?trash.map(t=>`<div class="row"><div class="m"><b>${esc(t.desc||t.type)}</b><small class="mu">${t.date}</small></div><div class="a">${fmt(t.amt)}</div><button class="btn o s" data-r="${t.id}">Restore</button><button class="btn o s" data-p="${t.id}">Delete forever</button></div>`).join(''):'<div class="empty">Trash is empty.</div>'}</div>`}
+
+const ib=k=>db.items.filter(i=>i.kind==k).reduce((s,i)=>s+i.amt,0);
+const DN=['Su','Mo','Tu','We','Th','Fr','Sa'];
+let pend=new URLSearchParams(location.search).get('add');if(pend)history.replaceState(null,'',location.pathname);
+let lastAct=Date.now(),hidAt=0;
+async function unlock(pw){try{const k=await derive(pw,ub(ls('ll_salt'))),e=JSON.parse(ls('ll_enc'));db=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(e.iv)},k,ub(e.ct))));KEY=k;LOCKED=false;fails=0;ls('ll_fail','0');init2();return true}catch(x){fails++;ls('ll_fail',String(fails));return false}}
+async function setPw(pw){const salt=crypto.getRandomValues(new Uint8Array(16));ls('ll_salt',b64(salt));KEY=await derive(pw,salt);await seal();ls(K,'')}
+function lock(){if(!KEY)return;KEY=null;LOCKED=true;db={cur:'₹',accounts:[],cats:[],merchants:[],companies:[],tx:[],rules:[],jobs:[],items:[]};const d=$('#dlg');if(d.open)d.close();render()}
+function lockHtml(){return `<div class="card" style="max-width:360px;margin:12vh auto"><h2>LifeLedger</h2><p class="mu">Enter your password to unlock.</p><label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password"><div class="f" style="margin-top:12px"><button class="btn" id="lu">Unlock</button></div><p id="lm" class="mu" role="alert"></p></div>`}
+function lockBind(){const go=async()=>{const b=$('#lu');b.disabled=true;if(fails>2)$('#lm').textContent='Please wait…';await new Promise(r=>setTimeout(r,fails>2?Math.min(30,2**(fails-2))*1000:0));if(await unlock($('#lp').value))render();else{b.disabled=false;$('#lm').textContent='Wrong password.';$('#lp').select()}};$('#lu').onclick=go;$('#lp').onkeydown=e=>{if(e.key=='Enter')go()};$('#lp').focus()}
+function secHtml(){const en=!!ls('ll_enc'),al=ls('ll_al')||'5';return `<div class="card"><h3>Security</h3><p class="mu">${en?'Data is encrypted (AES-256-GCM) with a key from your password (PBKDF2). If you forget the password it cannot be recovered, so keep a backup. Backups exported below are NOT encrypted.':'Not protected yet. Set a password to encrypt your data on this device.'}</p><label for="pw">${en?'New password':'Password'} (min 8 characters)</label><input id="pw" type="password" autocomplete="new-password"><div class="f" style="margin-top:10px"><button class="btn" id="spw">${en?'Change':'Enable'} password</button>${en?'<button class="btn o" id="lk">Lock now</button><button class="btn o" id="rpw">Remove password</button>':''}</div><label for="al">Auto-lock</label><select id="al">${[['0','Immediately when app is left'],['1','After 1 minute'],['5','After 5 minutes'],['15','After 15 minutes'],['never','Never']].map(([v,t])=>`<option value="${v}" ${v==al?'selected':''}>${t}</option>`).join('')}</select><p id="sm" class="mu" role="status"></p></div>`}
+function secBind(){$('#al').onchange=e=>ls('ll_al',e.target.value);$('#spw').onclick=async()=>{const p=$('#pw').value;if(p.length<8)return $('#sm').textContent='Use at least 8 characters.';$('#sm').textContent='Encrypting…';await setPw(p);render()};
+ const l=$('#lk');if(l){l.onclick=lock;$('#rpw').onclick=()=>{if(armed!='rpw'){armed='rpw';$('#rpw').textContent='Tap again to remove';return}armed='';KEY=null;ls('ll_enc','');ls('ll_salt','');ls(K,JSON.stringify(db));render()}}}
+const sch=r=>r.kind=='month'?'Monthly on day '+r.dom:r.days.slice().sort().map(i=>DN[i]).join(' ');
+const isDue=r=>{if(!r.on||r.last==today())return false;const n=new Date();if(n.toTimeString().slice(0,5)<r.time)return false;return r.kind=='month'?n.getDate()==+r.dom:r.days.includes(n.getDay())};
+function dueHtml(){return db.rules.filter(isDue).map(r=>`<div class="card" style="margin-bottom:10px;border-color:var(--ac)"><b>${esc(r.name)}</b> <span class="mu">due today</span><div class="f" style="margin:10px 0 0"><button class="btn" data-ra="${r.id}">Add ${fmt(r.amt)}</button><button class="btn o" data-rs="${r.id}">Skip today</button></div></div>`).join('')}
+function dueBind(){document.querySelectorAll('[data-ra]').forEach(b=>b.onclick=()=>addRule(b.dataset.ra));document.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>addRule(b.dataset.rs,1))}
+function addRule(id,skip){const r=db.rules.find(x=>x.id==id);if(!r)return;if(!skip)db.tx.push({id:uid(),at:String(Date.now()),created:Date.now(),updated:Date.now(),type:r.type,amt:r.amt,date:today(),acc:r.acc,cat:r.cat,desc:r.name,rule:r.id});r.last=today();save();render()}
+async function checkDue(){if(LOCKED)return;for(const r of db.rules.filter(isDue)){const k='ll_n_'+r.id+today();if(ls(k))continue;ls(k,'1');try{if(Notification.permission=='granted'){const reg=await navigator.serviceWorker.ready;reg.showNotification('LifeLedger',{body:`Add ${db.cur}${r.amt} for ${r.name}?`,tag:r.id,data:{id:r.id},actions:[{action:'add',title:`Add ${db.cur}${r.amt}`}]})}}catch(e){}}}
+function init2(){['rules','jobs','items'].forEach(k=>db[k]=db[k]||[]);if(pend){const r=db.rules.find(x=>x.id==pend);pend=null;if(r&&r.last!=today()){addRule(r.id);return}}checkDue()}
+function reps(){
+ bind=()=>{$('#nr').onclick=()=>ruleForm();const n=$('#nt');if(n)n.onclick=async()=>{await Notification.requestPermission();render()};document.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>ruleForm(b.dataset.re));document.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>{db.rules=db.rules.filter(r=>r.id!=b.dataset.rd);save();render()})};
+ return `<div class="f"><button class="btn" id="nr">+ Add repeating item</button>${'Notification' in window&&Notification.permission=='default'?'<button class="btn o" id="nt">Enable notifications</button>':''}</div>${dueHtml()}<div class="card">${db.rules.length?db.rules.map(r=>`<div class="row"><div class="m"><b>${esc(r.name)}</b><small class="mu">${sch(r)} · ${r.time}${r.on?'':' · paused'}</small></div><div class="a ${r.type=='income'?'in':'ex'}">${fmt(r.amt)}</div><button class="btn o s" data-re="${r.id}">Edit</button><button class="btn o s" data-rd="${r.id}" aria-label="Delete">✕</button></div>`).join(''):'<div class="empty">No repeating items. Add things like metro parking, rent or salary and add each with one tap.</div>'}</div>`}
+function ruleForm(id){const r=id?db.rules.find(x=>x.id==id):{name:'',type:'expense',amt:'',acc:'',cat:'',kind:'week',days:[1,2,3,4,5],dom:1,time:'22:00',on:true};const d=$('#dlg');
+ d.innerHTML=`<h3>${id?'Edit':'New'} repeating item</h3><label for="rn">Name</label><input id="rn" value="${esc(r.name)}" placeholder="Metro parking"><div class="f"><div style="flex:1"><label for="rt">Type</label><select id="rt"><option value="expense" ${r.type=='expense'?'selected':''}>Expense</option><option value="income" ${r.type=='income'?'selected':''}>Income</option></select></div><div style="flex:1"><label for="rv">Amount</label><input id="rv" type="number" value="${r.amt}"></div></div><label for="rac">Account</label><input id="rac" list="dl-a" value="${esc(nm(db.accounts,r.acc))}"><label for="rc">Category</label><input id="rc" list="dl-c" value="${esc(nm(db.cats,r.cat))}" placeholder="Transport"><label for="rk">Repeats</label><select id="rk"><option value="week" ${r.kind=='week'?'selected':''}>Weekly on chosen days</option><option value="month" ${r.kind=='month'?'selected':''}>Monthly on a date</option></select><div id="rw" class="seg" style="margin-top:8px">${DN.map((n,i)=>`<button data-w="${i}" class="${r.days.includes(i)?'on':''}">${n}</button>`).join('')}</div><div id="rm"><label for="rdm">Day of month</label><input id="rdm" type="number" min="1" max="31" value="${r.dom}"></div><label for="rtm">Remind at</label><input id="rtm" type="time" value="${r.time}"><label><input type="checkbox" id="ron" style="width:auto" ${r.on?'checked':''}> Active</label>${dl('dl-a',db.accounts)}${dl('dl-c',db.cats)}<div class="f" style="margin-top:14px"><button class="btn o" id="x">Cancel</button><button class="btn" id="ok">Save</button></div>`;
+ const sy=()=>{const w=$('#rk').value=='week';$('#rw').classList.toggle('hide',!w);$('#rm').classList.toggle('hide',w)};sy();$('#rk').onchange=sy;
+ d.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>b.classList.toggle('on'));d.showModal();$('#x').onclick=()=>d.close();
+ $('#ok').onclick=()=>{const amt=+$('#rv').value,name=$('#rn').value.trim(),days=[...d.querySelectorAll('[data-w].on')].map(b=>+b.dataset.w),kind=$('#rk').value;
+  if(!name)return $('#rn').focus();if(!(amt>0))return $('#rv').focus();if(kind=='week'&&!days.length)return;
+  const a=ens(db.accounts,$('#rac').value,{type:'Bank',opening:0}),c=ens(db.cats,$('#rc').value,{subs:[]});
+  const o={name,type:$('#rt').value,amt,acc:a?a.id:'',cat:c?c.id:'',kind,days,dom:+$('#rdm').value||1,time:$('#rtm').value||'22:00',on:$('#ron').checked};
+  if(id)Object.assign(r,o);else db.rules.push(Object.assign({id:uid(),last:''},o));save();d.close();render()}}
+const LB={goal:'Target amount',budget:'Monthly limit',investment:'Current value',asset:'Current value',liability:'Outstanding amount'};
+function plan(){
+ bind=()=>{$('#ni').onclick=()=>itemForm();$('#nj').onclick=()=>jobForm();document.querySelectorAll('[data-ie]').forEach(b=>b.onclick=()=>itemForm(b.dataset.ie));document.querySelectorAll('[data-je]').forEach(b=>b.onclick=()=>jobForm(b.dataset.je));document.querySelectorAll('[data-idl]').forEach(b=>b.onclick=()=>{db.items=db.items.filter(i=>i.id!=b.dataset.idl);save();render()})};
+ const ym=today().slice(0,7),btn=i=>`<button class="btn o s" data-ie="${i.id}">Edit</button><button class="btn o s" data-idl="${i.id}" aria-label="Delete">✕</button>`;
+ const info={goal:i=>{const p=Math.min(100,Math.round((i.saved||0)/i.amt*100));return `<small class="mu">${fmt(i.saved||0)} / ${fmt(i.amt)} · ${p}%</small><div class="bar"><i style="width:${p}%"></i></div>`},
+  budget:i=>{const s=sum(t=>t.type=='expense'&&t.date.startsWith(ym)&&nm(db.cats,t.cat).toLowerCase()==i.name.toLowerCase()),p=Math.min(100,Math.round(s/i.amt*100));return `<small class="${s>=i.amt?'ex':'mu'}">${fmt(s)} / ${fmt(i.amt)}${s>=i.amt?' · over budget':s>=i.amt*.9?' · nearly at limit':''}</small><div class="bar"><i style="width:${p}%;${s>=i.amt*.9?'background:var(--ex)':''}"></i></div>`}};
+ const sec=(k,t)=>{const l=db.items.filter(i=>i.kind==k);return `<div class="card" style="margin-bottom:12px"><h3>${t}</h3>${l.length?l.map(i=>`<div class="row"><div class="m"><b>${esc(i.name)}</b>${info[k]?info[k](i):`<small class="mu">${fmt(i.amt)}</small>`}</div>${btn(i)}</div>`).join(''):'<div class="empty">None yet</div>'}</div>`};
+ return `<div class="f"><button class="btn" id="ni">+ Goal / budget / holding</button><button class="btn o" id="nj">+ Job</button></div>${sec('goal','Savings goals')}${sec('budget','Monthly budgets')}${sec('investment','Investments')}${sec('asset','Assets')}${sec('liability','Liabilities')}
+ <div class="card"><h3>Career</h3>${db.jobs.length?db.jobs.slice().sort((a,b)=>b.start.localeCompare(a.start)).map(j=>`<div class="row"><div class="m"><b>${esc(j.title)} · ${esc(nm(db.companies,j.co))}</b><small class="mu">${j.type} · ${j.start} → ${j.end||'present'}</small><small class="mu">${j.sal.map(s=>fmt(s.amt)).join(' → ')||'No salary yet'}</small></div><button class="btn o s" data-je="${j.id}">Edit</button></div>`).join(''):'<div class="empty">Add internships and jobs to track salary progression.</div>'}</div>`}
+function itemForm(id){const i=id?db.items.find(x=>x.id==id):{kind:'goal',name:'',amt:'',saved:0};const d=$('#dlg');
+ d.innerHTML=`<h3>${id?'Edit':'Add'} item</h3><label for="ik">Kind</label><select id="ik">${[['goal','Savings goal'],['budget','Monthly budget (category)'],['investment','Investment'],['asset','Asset'],['liability','Liability / loan']].map(([v,t])=>`<option value="${v}" ${v==i.kind?'selected':''}>${t}</option>`).join('')}</select><label for="inm">Name (budget: category)</label><input id="inm" list="dl-c" value="${esc(i.name)}"><label for="iv" id="ilv"></label><input id="iv" type="number" value="${i.amt}"><div id="isv"><label for="is">Saved so far</label><input id="is" type="number" value="${i.saved||0}"></div>${dl('dl-c',db.cats)}<div class="f" style="margin-top:14px"><button class="btn o" id="x">Cancel</button><button class="btn" id="ok">Save</button></div>`;
+ const ks=()=>{const k=$('#ik').value;$('#ilv').textContent=LB[k];$('#isv').classList.toggle('hide',k!='goal')};ks();$('#ik').onchange=ks;d.showModal();$('#x').onclick=()=>d.close();
+ $('#ok').onclick=()=>{const name=$('#inm').value.trim(),amt=+$('#iv').value,kind=$('#ik').value;if(!name)return $('#inm').focus();if(!(amt>0))return $('#iv').focus();if(kind=='budget')ens(db.cats,name,{subs:[]});
+  const o={kind,name,amt,saved:+$('#is').value||0};if(id)Object.assign(i,o);else db.items.push(Object.assign({id:uid()},o));save();d.close();render()}}
+function jobForm(id){const j=id?db.jobs.find(x=>x.id==id):{co:'',title:'',type:'Full-time',start:today(),end:'',sal:[]};const lat=(j.sal.slice(-1)[0]||{}).amt||'';const d=$('#dlg');
+ d.innerHTML=`<h3>${id?'Edit':'Add'} job</h3><label for="jc">Company</label><input id="jc" list="dl-co" value="${esc(nm(db.companies,j.co))}" placeholder="Google"><label for="jt">Title</label><input id="jt" value="${esc(j.title)}"><label for="jy">Type</label><select id="jy">${['Internship','Full-time','Part-time','Contract','Freelance','Temporary','Other'].map(x=>`<option ${x==j.type?'selected':''}>${x}</option>`).join('')}</select><div class="f"><div style="flex:1"><label for="js">Start</label><input id="js" type="date" value="${j.start}"></div><div style="flex:1"><label for="je">End (blank = current)</label><input id="je" type="date" value="${j.end}"></div></div><label for="jm">Monthly salary / stipend</label><input id="jm" type="number" value="${lat}"><label for="jf">Salary effective from (a change adds a new salary record)</label><input id="jf" type="date" value="${id?today():j.start}">${dl('dl-co',db.companies)}<div class="f" style="margin-top:14px"><button class="btn o" id="x">Cancel</button><button class="btn" id="ok">Save</button></div>`;
+ d.showModal();$('#x').onclick=()=>d.close();
+ $('#ok').onclick=()=>{const co=ens(db.companies,$('#jc').value),t=$('#jt').value.trim();if(!co)return $('#jc').focus();if(!t)return $('#jt').focus();
+  const amt=+$('#jm').value,o={co:co.id,title:t,type:$('#jy').value,start:$('#js').value||today(),end:$('#je').value};
+  if(id)Object.assign(j,o);else{Object.assign(j,o);j.id=uid();db.jobs.push(j)}
+  if(amt>0&&amt!=lat)j.sal.push({from:$('#jf').value||o.start,amt});save();d.close();render()}}
+['pointerdown','keydown'].forEach(e=>addEventListener(e,()=>lastAct=Date.now()));
+setInterval(()=>{const a=ls('ll_al')||'5';if(KEY&&a!='never'&&+a>0&&Date.now()-lastAct>+a*6e4)lock();checkDue()},30000);
+document.addEventListener('visibilitychange',()=>{const a=ls('ll_al')||'5';if(document.hidden){hidAt=Date.now();if(KEY&&a=='0')lock()}else{if(KEY&&a!='never'&&Date.now()-hidAt>=+a*6e4)lock();else if(!LOCKED){checkDue();if(!$('#dlg').open)render()}}});
+if(navigator.serviceWorker)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.add){pend=e.data.add;if(!LOCKED){init2();render()}}});
 $('#add').onclick=()=>form();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http')){navigator.serviceWorker.register('sw.js').catch(()=>{})}
-
+if(!LOCKED)init2();
 render();
 </script></body></html>
